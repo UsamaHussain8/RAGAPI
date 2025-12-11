@@ -1,0 +1,11 @@
+.env
+Readme.txt
+PDFChatEnv/
+PDFChatEnvLatest/
+__pycache__/
+trained_db/
+math_solver.py
+api.py
+api_calls.py
+*.sqlite3
+*.pyc
