@@ -10,7 +10,7 @@ openai_api_key = os.getenv(configs.OPEN_API_KEY)
 
 app = FastAPI()
 
-app.include_router(chat_router)
+app.include_router(chat_router, prefix="/api/v1")
 
 if __name__== '__main__':
     uvicorn.run(app, host='127.0.0.1', port=8080)

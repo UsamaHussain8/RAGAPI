@@ -5,6 +5,8 @@ from dotenv import dotenv_values
 from collections import namedtuple
 from operator import itemgetter
 import uuid
+from redis import Redis
+from rq import Queue
 
 from fastapi import FastAPI, File, UploadFile, APIRouter, Request, Form, HTTPException, status
 
@@ -34,9 +36,15 @@ async def create_upload_file(user_id: str = Form(...), pdf_file: UploadFile = Fi
     pdf_folder_path = f"Training_Data"
     os.makedirs(pdf_folder_path, exist_ok=True)
     
-    file_path = os.path.join(pdf_folder_path, pdf_file.filename)
-    with open(file_path, "wb") as temp_dest_file:
-        temp_dest_file.write(await pdf_file.read())
+    # Use a unique temporary filename to avoid collisions, especially if multiple users upload the same file name
+    unique_filename = f"{uuid.uuid4()}_{pdf_file.filename}"
+    file_path = os.path.join(pdf_folder_path, unique_filename)
+
+    try:
+        with open(file_path, "wb") as temp_dest_file:
+            temp_dest_file.write(await pdf_file.read())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {e}")
         
     docs = read_docs(file_path, user_id)
     vectordb = generate_and_store_embeddings(docs, pdf_file, user_id)

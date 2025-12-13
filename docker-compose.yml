@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # 1. Redis Service (The Message Broker)
+  redis:
+    image: redis:7-alpine
+    container_name: redis_broker
+
+  # 2. MongoDB Service for storing chat history  
+  mongodb:
+    image: mongo:latest 
+    container_name: mongodb_db
+    volumes:
+      - mongo_data:/data/db
+    # Port exposed for local GUI tools (e.g., Mongo Compass)
+    ports:
+      - "27017:27017"
+
+  # 3. Web Service (FastAPI API)
+  web:
+    build: .
+    container_name: fastapi_web
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./trained_db:/app/trained_db
+      - ./Training_Data:/app/Training_Data
+    depends_on:
+      - redis
+      - mongodb
+    env_file:
+      - ./.env
+    environment:
+      REDIS_URL: redis://redis:6379/0 
+      MONGO_CONNECTION_STRING: mongodb://mongodb:27017/
+
+  # 4. Worker Service (RQ Worker)
+  worker:
+    build: .
+    container_name: rq_worker
+    command: rq worker rag_jobs --url redis://redis:6379/0
+    volumes:
+      - .:/app
+      - ./trained_db:/app/trained_db
+      - ./Training_Data:/app/Training_Data
+    depends_on:
+      - redis
+      - mongodb
+    env_file:
+      - ./.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      MONGO_CONNECTION_STRING: mongodb://mongodb:27017/
+
+# --- TOP-LEVEL VOLUMES SECTION ---
+volumes:
+  mongo_data:
+    driver: local
