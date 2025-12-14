@@ -15,12 +15,12 @@ from utils.retrieval import get_chroma_client, get_chroma_collection, get_chroma
 
 index_router = APIRouter()
 
-@index_router.post("/trainpdf/", status_code=status.HTTP_201_CREATED)
+@index_router.post("/uploadpdf/", status_code=status.HTTP_201_CREATED)
 async def create_upload_file(user_id: str = Form(...), pdf_file: UploadFile = File(...)):
     if not pdf_file.filename.endswith(".pdf"):
         return {"code": 400, "answer": "Only PDF files are allowed."}
     
-    pdf_folder_path = f"Training_Data"
+    pdf_folder_path = configs.UPLOADS_FOLDER
     os.makedirs(pdf_folder_path, exist_ok=True)
     
     # Use a unique temporary filename to avoid collisions, especially if multiple users upload the same file name
@@ -37,7 +37,7 @@ async def create_upload_file(user_id: str = Form(...), pdf_file: UploadFile = Fi
     vectordb = generate_and_store_embeddings(docs, pdf_file)
 
     if vectordb is None:
-        return {"code": 400, "answer": "Error Occurred during Data Extraction from Pdf."}
+        return {"code": 400, "answer": "Error Occurred during Data Extraction from PDF."}
         
     shutil.rmtree(pdf_folder_path, ignore_errors=True)
 

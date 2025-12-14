@@ -9,3 +9,7 @@ api.py
 api_calls.py
 *.sqlite3
 *.pyc
+vector_db/
+*.bin
+*.pickle
+uploads/
