@@ -10,7 +10,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 
 from utils.retrieval import get_chroma_retriever
-from ..main import configs
+from config import configs
 
 chat_router = APIRouter()   
 
@@ -21,7 +21,7 @@ async def pdf_chat(query_params: dict):
     session_id: str = user_id + "-" + datetime.now().strftime("%d/%m/%Y")
 
     model = configs.CHAT_MODEL
-    llm = ChatOpenAI(openai_api_key=configs.OPEN_API_KEY, model = model, temperature = 0.0)
+    llm = ChatOpenAI(openai_api_key=configs.OPENAI_API_KEY, model = model, temperature = 0.0)
     
     # Create contextualize question prompt for history-aware retrieval
     contextualize_q_system_prompt = """Given a chat history and the latest user question \
@@ -90,4 +90,4 @@ def format_docs(docs):
 def get_message_history(session_id: str) -> MongoDBChatMessageHistory:
     return MongoDBChatMessageHistory(connection_string=configs.MONGO_CONNECTION_STRING, 
                                      session_id=session_id, 
-                                     collection_name="Chat_History")
+                                     collection_name=configs.MONGODB_COLLECTION_NAME)

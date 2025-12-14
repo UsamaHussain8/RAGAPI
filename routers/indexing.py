@@ -6,14 +6,12 @@ import datetime
 from fastapi import File, UploadFile, APIRouter, Form, HTTPException, status
 
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-import chromadb
-from chromadb.utils import embedding_functions
 
-from ..main import configs
-
+from config import configs
+from utils.embeddings import get_embeddings
+from utils.retrieval import get_chroma_client, get_chroma_collection, get_chroma_instance
 
 index_router = APIRouter()
 
@@ -47,10 +45,7 @@ async def create_upload_file(user_id: str = Form(...), pdf_file: UploadFile = Fi
 
 @index_router.post("/deletepdf/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_pdf_doc(pdf_file: UploadFile = File(...)):
-    embeddings = OpenAIEmbeddings(openai_api_key=configs.OPEN_API_KEY)
-    client = chromadb.PersistentClient(path="./trained_db")
-    collection = client.get_or_create_collection("PDF_Embeddings", embedding_function=embedding_functions.OpenAIEmbeddingFunction(api_key=configs.OPEN_API_KEY, model_name=configs.EMBEDDINGS_MODEL))
-    vectordb = Chroma(persist_directory="./trained_db", embedding_function=embeddings, collection_name = collection.name)
+    vectordb = get_chroma_instance()
     
     data_associated_with_ids = vectordb.get(where={"source": pdf_file.filename})
     if data_associated_with_ids["ids"]:
@@ -82,16 +77,14 @@ def read_docs(pdf_file: str, user_id: str):
     return documents
 
 async def generate_and_store_embeddings(documents, pdf_file):
-    client = chromadb.PersistentClient(path="./trained_db")
-    collection = await client.get_or_create_collection("PDF_Embeddings",
-                                                 embedding_function=embedding_functions.OpenAIEmbeddingFunction(api_key=configs.OPEN_API_KEY,
-                                                                                                                model_name=configs.EMBEDDINGS_MODEL))
-
+    client = get_chroma_client()
+    collection = get_chroma_collection()
+    embeddings = get_embeddings()
     try:
         vectordb = Chroma.from_documents(
                     documents,
-                    embedding=OpenAIEmbeddings(openai_api_key=configs.OPEN_API_KEY, model=configs.EMBEDDINGS_MODEL),
-                    persist_directory='./trained_db',
+                    embedding=embeddings,
+                    persist_directory=configs.PERSIST_DIRECTORY,
                     collection_name = collection.name, 
                     client = client
         )
