@@ -10,8 +10,8 @@ from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from config import configs
-from utils.embeddings import get_embeddings
-from utils.retrieval import get_chroma_client, get_chroma_collection, get_chroma_instance
+from utils.embeddings import get_embeddings_function
+from utils.retrieval import get_chroma_instance
 
 index_router = APIRouter()
 
@@ -76,23 +76,24 @@ def read_docs(pdf_file: str, user_id: str):
 
     return documents
 
-async def generate_and_store_embeddings(documents, pdf_file):
-    client = get_chroma_client()
-    collection = get_chroma_collection()
-    embeddings = get_embeddings()
+def generate_and_store_embeddings(documents, pdf_file):
+    embeddings_function = get_embeddings_function()
     try:
         vectordb = Chroma.from_documents(
                     documents,
-                    embedding=embeddings,
+                    embedding=embeddings_function,
                     persist_directory=configs.PERSIST_DIRECTORY,
-                    collection_name = collection.name, 
-                    client = client
+                    collection_name = configs.COLLECTION_NAME, 
         )
-        print(collection.count())
-        data_associated_with_ids = vectordb.get(where={"source": pdf_file.filename})
-        print(data_associated_with_ids["ids"])
+        vectordb._client.persist()
+        print(vectordb._collection.count())
+        data_associated_with_ids = vectordb.get(
+            where={"source": pdf_file.filename},
+            include=['ids']       
+        )
+        print(f"IDs associated with {pdf_file.filename}: {data_associated_with_ids['ids']}")
 
     except Exception as err:
         print(f"An error occured: {err=}, {type(err)=}")
-        return {"answer": "An error occured while generating embeddings. Please check terminal for more details."}
+        return {"answer": "An error occured while generating embeddings."}
     return vectordb
