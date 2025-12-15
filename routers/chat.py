@@ -18,8 +18,8 @@ chat_router = APIRouter()
 async def pdf_chat(query_params: dict):
     user_id: str = query_params.get('user_id')
     query: str = query_params.get('query')
-    session_id: str = user_id + "-" + datetime.now().strftime("%d/%m/%Y")
-
+    # session_id: str = user_id + "-" + datetime.now().strftime("%d-%m-%Y")
+    session_id: str = "TEST_SESSION_ID_001"
     model = configs.CHAT_MODEL
     llm = ChatOpenAI(openai_api_key=configs.OPENAI_API_KEY, model = model, temperature = 0.0)
     
@@ -51,13 +51,26 @@ async def pdf_chat(query_params: dict):
     
     retriever = get_chroma_retriever()
     # Create RAG chain using LCEL
+    # rag_chain = (
+    #     RunnablePassthrough.assign(
+    #         context=lambda x: format_docs(retriever.invoke(x["input"]))
+    #     )
+    #     | qa_prompt
+    #     | llm
+    #     | StrOutputParser()
+    # )
+    # The chain that generates the answer
+    answer_chain = qa_prompt | llm | StrOutputParser()
+
     rag_chain = (
         RunnablePassthrough.assign(
             context=lambda x: format_docs(retriever.invoke(x["input"]))
         )
-        | qa_prompt
-        | llm
-        | StrOutputParser()
+        | {
+            "context": lambda x: x["context"], # Pass context forward (optional, but good)
+            "input": RunnablePassthrough(), # Pass original input forward
+            "answer": answer_chain, # The actual LLM generated answer
+        }
     )
     
     # Wrap with message history
@@ -67,6 +80,8 @@ async def pdf_chat(query_params: dict):
         input_messages_key="input",
         history_messages_key="chat_history",
         output_messages_key="answer",
+        database_name=configs.MONGODB_DATABASE_NAME, 
+        collection_name=configs.MONGODB_COLLECTION_NAME
     )
     
     try:
@@ -90,4 +105,6 @@ def format_docs(docs):
 def get_message_history(session_id: str) -> MongoDBChatMessageHistory:
     return MongoDBChatMessageHistory(connection_string=configs.MONGO_CONNECTION_STRING, 
                                      session_id=session_id, 
-                                     collection_name=configs.MONGODB_COLLECTION_NAME)
+                                     collection_name=configs.MONGODB_COLLECTION_NAME,
+                                     database_name=configs.MONGODB_DATABASE_NAME
+                                    )

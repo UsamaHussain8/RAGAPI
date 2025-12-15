@@ -10,6 +10,9 @@ services:
   mongodb:
     image: mongo:latest 
     container_name: mongodb_db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: rootuser 
+      MONGO_INITDB_ROOT_PASSWORD: rootpassword
     volumes:
       - mongo_data:/data/db
     # Port exposed for local GUI tools (e.g., Mongo Compass)
@@ -34,7 +37,7 @@ services:
       - ./.env
     environment:
       REDIS_URL: redis://redis:6379/0 
-      MONGO_CONNECTION_STRING: mongodb://mongodb:27017/
+      MONGO_CONNECTION_STRING: mongodb://rootuser:rootpassword@mongodb:27017/admin?authSource=admin
 
   # 4. Worker Service (RQ Worker)
   worker:
@@ -52,7 +55,7 @@ services:
       - ./.env
     environment:
       REDIS_URL: redis://redis:6379/0
-      MONGO_CONNECTION_STRING: mongodb://mongodb:27017/
+      MONGO_CONNECTION_STRING: mongodb://rootuser:rootpassword@mongodb:27017/admin?authSource=admin
 
 # --- TOP-LEVEL VOLUMES SECTION ---
 volumes:
