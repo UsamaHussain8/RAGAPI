@@ -18,8 +18,7 @@ chat_router = APIRouter()
 async def pdf_chat(query_params: dict):
     user_id: str = query_params.get('user_id')
     query: str = query_params.get('query')
-    # session_id: str = user_id + "-" + datetime.now().strftime("%d-%m-%Y")
-    session_id: str = "TEST_SESSION_ID_001"
+    session_id: str = user_id + "-" + datetime.now().strftime("%d-%m-%Y")
     model = configs.CHAT_MODEL
     llm = ChatOpenAI(openai_api_key=configs.OPENAI_API_KEY, model = model, temperature = 0.0)
     
@@ -90,8 +89,9 @@ async def pdf_chat(query_params: dict):
             {"input": query},
             config={"configurable": {"session_id": session_id}},
         )
+        final_answer = result.get('answer', 'Error: Answer not found.')
         
-        return {'answer': result}
+        return {'answer': final_answer}
     
     except Exception as err:
         print(f"Error during chat: {err}")
