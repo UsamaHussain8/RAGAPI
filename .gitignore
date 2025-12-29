@@ -13,3 +13,4 @@ vector_db/
 *.bin
 *.pickle
 uploads/
+*.ipynb

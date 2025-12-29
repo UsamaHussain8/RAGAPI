@@ -43,7 +43,8 @@ services:
   worker:
     build: .
     container_name: rq_worker
-    command: rq worker rag_jobs --url redis://redis:6379/0
+    command: rq worker rag_tasks --url redis://redis:6379/0
+    replicas: 3
     volumes:
       - .:/app
       - ./vector_db:/app/vector_db

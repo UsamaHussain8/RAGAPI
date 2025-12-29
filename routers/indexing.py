@@ -2,16 +2,20 @@ import os
 import uuid
 import shutil
 import datetime
+from typing import List
 
 from fastapi import File, UploadFile, APIRouter, Form, HTTPException, status
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 
 from config import configs
 from utils.embeddings import get_embeddings_function
 from utils.retrieval import get_chroma_instance
+from queues.rag_tasks import process_pdf_embeddings_task
+from client.rq_client import tasks_queue
 
 index_router = APIRouter()
 
@@ -32,16 +36,17 @@ async def create_upload_file(user_id: str = Form(...), pdf_file: UploadFile = Fi
             temp_dest_file.write(await pdf_file.read())
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save file: {e}")
-        
-    docs = read_docs(file_path, user_id)
-    vectordb = generate_and_store_embeddings(docs, pdf_file)
+    
+    job = tasks_queue.enqueue(
+        process_pdf_embeddings_task,
+        args=(file_path, user_id, pdf_file.filename)
+    )
 
-    if vectordb is None:
-        return {"code": 400, "answer": "Error Occurred during Data Extraction from PDF."}
-        
-    shutil.rmtree(pdf_folder_path, ignore_errors=True)
-
-    return {"code": "201", "answer": "PDF Embeddings generated successfully"}
+    return {
+        "code": "202", 
+        "answer": "Upload received. Processing in background.",
+        "job_id": job.get_id() # Give the user a ticket number
+    }
 
 @index_router.post("/deletepdf/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_pdf_doc(pdf_file: UploadFile = File(...)):
@@ -54,7 +59,7 @@ async def delete_pdf_doc(pdf_file: UploadFile = File(...)):
     
     return {"code": 200, "answer": "PDF Embeddings deleted successfully"}
 
-def read_docs(pdf_file: str, user_id: str):
+def read_docs(pdf_file: str, user_id: str, original_filename: str):
     pdf_loader = PyPDFLoader(pdf_file)
     pdf_documents = pdf_loader.load()
 
@@ -76,7 +81,7 @@ def read_docs(pdf_file: str, user_id: str):
 
     return documents
 
-def generate_and_store_embeddings(documents, pdf_file):
+def generate_and_store_embeddings(documents: List[Document], pdf_file_name: str):
     embeddings_function = get_embeddings_function()
     try:
         vectordb = Chroma.from_documents(
@@ -88,10 +93,10 @@ def generate_and_store_embeddings(documents, pdf_file):
         vectordb._client.persist()
         print(vectordb._collection.count())
         data_associated_with_ids = vectordb.get(
-            where={"source": pdf_file.filename},
+            where={"source": pdf_file_name},
             include=['ids']       
         )
-        print(f"IDs associated with {pdf_file.filename}: {data_associated_with_ids['ids']}")
+        print(f"IDs associated with {pdf_file_name}: {data_associated_with_ids['ids']}")
 
     except Exception as err:
         print(f"An error occured: {err=}, {type(err)=}")
