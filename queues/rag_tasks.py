@@ -2,6 +2,8 @@ import os
 import shutil
 from dotenv import load_dotenv
 
+from rq import get_current_job
+
 from langchain_openai import ChatOpenAI
 from langchain_mongodb import MongoDBChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -16,7 +18,19 @@ from routers.indexing import read_docs, generate_and_store_embeddings
 load_dotenv()
 
 def process_pdf_embeddings_task(file_path, user_id, original_filename):
+    job = get_current_job()
+    if job:
+        job.meta['status_msg'] = "Reading PDF content..."
+        job.meta['progress'] = 20
+        job.save_meta()
+
     docs = read_docs(file_path, user_id, original_filename)
+    
+    # Step 2: Embedding
+    if job:
+        job.meta['status_msg'] = "Generating embeddings (this may take a minute)..."
+        job.meta['progress'] = 60
+        job.save_meta()
     vectordb = generate_and_store_embeddings(docs, original_filename)
 
     if vectordb is None:
@@ -27,7 +41,7 @@ def process_pdf_embeddings_task(file_path, user_id, original_filename):
 
     # shutil.rmtree(file_path, ignore_errors=True)
 
-    return {"code": "201", "answer": "PDF Embeddings generated successfully"}
+    return {"code": "201", "docs_processed": len(docs), "source": file_path}
 
 def process_user_query(query: str, session_id: str):
     model = configs.CHAT_MODEL

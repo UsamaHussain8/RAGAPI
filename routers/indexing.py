@@ -4,6 +4,8 @@ import shutil
 import datetime
 from typing import List
 
+from rq import Retry
+
 from fastapi import File, UploadFile, APIRouter, Form, HTTPException, status
 
 from langchain_community.document_loaders import PyPDFLoader
@@ -39,7 +41,10 @@ async def create_upload_file(user_id: str = Form(...), pdf_file: UploadFile = Fi
     
     job = tasks_queue.enqueue(
         process_pdf_embeddings_task,
-        args=(file_path, user_id, pdf_file.filename)
+        args=(file_path, user_id, pdf_file.filename),
+        result_ttl=3600,
+        job_timeout=600,
+        retry=Retry(max=3, interval=30)
     )
 
     return {
